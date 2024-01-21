@@ -1,2 +1,3 @@
 # wow-using-pow
-Assignment implementation for faraway.com :)
+
+World of Wisdom with protection using Proof of Work
