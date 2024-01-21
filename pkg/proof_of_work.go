@@ -53,20 +53,19 @@ func IsHashCorrect(hash []byte, zerosCount int32) bool {
 }
 
 // bruteforce until IsHashCorrect is true
-func (h *HashcashHeader) ComputeHashcash(maxCounterValue int32) (*HashcashHeader, error) {
-	result := *h
-	for result.Counter <= maxCounterValue {
-		header := result.ToString()
-		hash, err := countSHA1(header)
+func ComputeHashcash(header *HashcashHeader, maxCounterValue int32) (*HashcashHeader, error) {
+	for header.Counter <= maxCounterValue {
+		strHeader := header.ToString()
+		hash, err := countSHA1(strHeader)
 		if err != nil {
 			return nil, err
 		}
 		//fmt.Println(header, hash)
-		if IsHashCorrect(hash, result.ZerosCount) {
-			return &result, nil
+		if IsHashCorrect(hash, header.ZerosCount) {
+			return header, nil
 		}
 		// if hash don't have needed count of leading zeros, we are increasing counter and try next hash
-		result.Counter++
+		header.Counter++
 	}
 	return nil, fmt.Errorf("max iterations exceeded")
 }

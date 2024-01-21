@@ -1,0 +1,47 @@
+version: "3.8"
+services:
+  client:
+    container_name: client
+    environment:
+      - SERVER_HOST=${SERVER_HOST}
+      - SERVER_PORT=${SERVER_PORT}
+      - HASHCASH_MAX_ITERATIONS_AMOUNT=${HASHCASH_MAX_ITERATIONS_AMOUNT}
+    build:
+      context: .
+      dockerfile: client.Dockerfile
+    networks:
+      - client-server-net
+    depends_on:
+      - server
+  server:
+    container_name: server
+    environment:
+      - SERVER_HOST=${SERVER_HOST}
+      - SERVER_PORT=${SERVER_PORT}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - HASHCASH_ZEROS_COUNT=${HASHCASH_ZEROS_COUNT}
+      - HASHCASH_CHALLENGE_LIFETIME=${HASHCASH_CHALLENGE_LIFETIME}
+    build:
+      context: .
+      dockerfile: server.Dockerfile
+    networks:
+      - redis-net
+      - client-server-net
+    depends_on:
+      - redis
+  redis:
+    container_name: ${REDIS_HOST}
+    image: redis:alpine
+    restart: always
+    networks:
+      - redis-net
+    expose:
+      - 6379
+    ports:
+      - '${REDIS_PORT}:6379'
+
+
+networks:
+  redis-net:
+  client-server-net:
