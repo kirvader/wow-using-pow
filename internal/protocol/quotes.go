@@ -1,4 +1,4 @@
-package server
+package protocol
 
 // TODO add text file and parsing for it
 var WOWQuotes = []string{

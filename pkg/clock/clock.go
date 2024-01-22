@@ -1,6 +1,8 @@
-package server
+package clock
 
 import "time"
+
+var _ Clock = &SystemClock{}
 
 type Clock interface {
 	Now() time.Time

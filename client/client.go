@@ -3,12 +3,11 @@ package client
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 
-	"github.com/kirvader/wow-using-pow/pkg"
+	protocol "github.com/kirvader/wow-using-pow/internal/protocol"
 )
 
 type Client struct {
@@ -30,66 +29,46 @@ func NewClient(serverAddress string, hashCashMaxIterationsAmount int32) (*Client
 	}, nil
 }
 
-func (client *Client) Run(ctx context.Context) error {
-	message, err := client.HandleConnection(ctx)
-	if err != nil {
-		return err
-	}
-	log.Printf("quote result: %s", message)
-	return nil
-}
-
 func (client *Client) Close() error {
 	return client.conn.Close()
 }
 
-func (client *Client) HandleConnection(ctx context.Context) (string, error) {
+func (client *Client) HandleConnection(ctx context.Context) error {
 	connBufReader := bufio.NewReader(client.conn)
 	connBufWriter := bufio.NewWriter(client.conn)
 
-	// 1. requesting challenge
-	err := pkg.SendMsg(connBufWriter, &pkg.Message{
-		MessageType: pkg.RequestChallenge,
-	})
-	if err != nil {
-		return "", fmt.Errorf("sending request for challenge failed: %w", err)
-	}
-	msg, err := pkg.ReadMsg(connBufReader)
-	if err != nil {
-		return "", fmt.Errorf("reading challenge msg failed: %w", err)
-	}
-	var hashcash *pkg.HashcashHeader = new(pkg.HashcashHeader)
-	err = json.Unmarshal([]byte(msg.Payload), &hashcash)
-	if err != nil {
-		return "", fmt.Errorf("hashcash unmarshal failed: %w", err)
-	}
-	log.Printf("got hashcash: %v", hashcash)
-
-	// 2. got challenge, compute hashcash
-	hashcash, err = pkg.ComputeHashcash(hashcash, client.hashCashMaxIterationsAmount)
-	if err != nil {
-		return "", fmt.Errorf("hashcash computing failed: %w", err)
-	}
-	log.Printf("hashcash computed: %v", hashcash)
-	byteData, err := json.Marshal(hashcash)
-	if err != nil {
-		return "", fmt.Errorf("hashcash marshalling failed: %w", err)
+	// request challenge
+	if err := protocol.RequestChallenge(connBufWriter); err != nil {
+		return fmt.Errorf("sending request for challenge failed: %v", err)
 	}
 
-	// 3. send challenge solution back to server
-	err = pkg.SendMsg(connBufWriter, &pkg.Message{
-		MessageType: pkg.RequestResource,
-		Payload:     string(byteData),
-	})
+	// receive challenge
+	powPuzzle, err := protocol.ReceiveChallenge(connBufReader)
 	if err != nil {
-		return "", fmt.Errorf("sending request failed: %w", err)
+		return fmt.Errorf("reading challenge msg failed: %v", err)
+	}
+	log.Printf("solving puzzle: %v", powPuzzle)
+
+	// solve challenge
+	err = powPuzzle.Solve(client.hashCashMaxIterationsAmount)
+	if err != nil {
+		return fmt.Errorf("puzzle solving failed: %v", err)
+	}
+	log.Printf("puzzle solved: %v", powPuzzle)
+
+	// send challenge solution
+	err = protocol.SendChallengeSolution(connBufWriter, powPuzzle)
+	if err != nil {
+		return fmt.Errorf("sending request failed: %v", err)
 	}
 	log.Print("challenge solution sent to server")
 
-	// 4. get result quote from server
-	resultMsg, err := pkg.ReadMsg(connBufReader)
+	// receive resource
+	resource, err := protocol.ReceiveResource(connBufReader)
 	if err != nil {
-		return "", fmt.Errorf("reading last response msg failed: %w", err)
+		return fmt.Errorf("reading resource failed: %v", err)
 	}
-	return resultMsg.Payload, nil
+	log.Printf("Received quote: %s", resource)
+
+	return nil
 }

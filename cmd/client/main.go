@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// to limit client resources
 	HashcashMaxIterationsAmount = "HASHCASH_MAX_ITERATIONS_AMOUNT"
 
 	ServerHost = "SERVER_HOST"
@@ -73,7 +74,7 @@ func main() {
 
 	for {
 		log.Println("running client...")
-		err = clientInstance.Run(ctx)
+		err = clientInstance.HandleConnection(ctx)
 		if err != nil {
 			log.Printf("client error: %v", err)
 		}
