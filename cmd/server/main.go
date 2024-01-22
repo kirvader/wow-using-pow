@@ -113,6 +113,6 @@ func main() {
 	}()
 
 	if err = server.Run(ctx); err != nil {
-		log.Printf("server returned an error: %v", err)
+		log.Printf("server error: %v", err)
 	}
 }

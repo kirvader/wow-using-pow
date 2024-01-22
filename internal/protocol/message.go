@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 )
 
 type MessageType int32
@@ -29,7 +28,6 @@ func Read(reader *bufio.Reader) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("read bytes: %s.", strMsg)
 	var msg Message
 	err = json.Unmarshal([]byte(strMsg), &msg)
 	if err != nil {

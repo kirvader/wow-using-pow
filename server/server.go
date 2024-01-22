@@ -85,6 +85,7 @@ func (srv *Server) handleConnection(ctx context.Context, conn net.Conn) {
 		msg, err := protocol.Read(reader)
 		if err != nil {
 			log.Printf("reading message from connection failed: %v", err)
+			return
 		}
 		if err = srv.processRequest(ctx, msg, conn); err != nil {
 			log.Printf("process request error: %v", err)
