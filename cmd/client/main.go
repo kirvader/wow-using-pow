@@ -75,7 +75,7 @@ func main() {
 		log.Println("running client...")
 		err = clientInstance.Run(ctx)
 		if err != nil {
-			fmt.Println("client error:", err)
+			log.Printf("client error: %v", err)
 		}
 
 		time.Sleep(5 * time.Second)

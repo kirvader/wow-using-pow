@@ -3,6 +3,8 @@ package pkg
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
+	"log"
 )
 
 type MessageType int32
@@ -40,11 +42,12 @@ func ParseMessage(msgBytes []byte) (*Message, error) {
 }
 
 func ReadMsg(reader *bufio.Reader) (*Message, error) {
-	var msgBytes []byte
-	if _, err := reader.Read(msgBytes); err != nil {
+	strMsg, err := reader.ReadString('\n')
+	if err != nil {
 		return nil, err
 	}
-	msg, err := ParseMessage(msgBytes)
+	log.Printf("read bytes: %s.", strMsg)
+	msg, err := ParseMessage([]byte(strMsg))
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +59,11 @@ func SendMsg(writer *bufio.Writer, msg *Message) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("sending %v", *msg)
 
-	_, err = writer.Write(msgBytes)
-	return err
+	_, err = writer.WriteString(fmt.Sprintf("%s\n", string(msgBytes)))
+	if err != nil {
+		return err
+	}
+	return writer.Flush()
 }

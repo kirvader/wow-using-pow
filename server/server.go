@@ -78,6 +78,7 @@ func (srv *Server) Run(ctx context.Context) error {
 func (srv *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
+	log.Printf("handling connection: %s", conn.RemoteAddr().String())
 	reader := bufio.NewReader(conn)
 	for {
 		msg, err := pkg.ReadMsg(reader)
@@ -92,7 +93,6 @@ func (srv *Server) handleConnection(ctx context.Context, conn net.Conn) {
 }
 
 func (srv *Server) processRequest(ctx context.Context, msg *pkg.Message, conn net.Conn) error {
-
 	clientInfo := conn.RemoteAddr().String()
 	currentTime := srv.clock.Now()
 
@@ -176,10 +176,6 @@ func (srv *Server) processRequest(ctx context.Context, msg *pkg.Message, conn ne
 }
 
 func sendMessageToClient(msg *pkg.Message, conn net.Conn) error {
-	marshalledMsg, err := msg.Marshal()
-	if err != nil {
-		return err
-	}
-	_, err = conn.Write(marshalledMsg)
-	return err
+	connBufWriter := bufio.NewWriter(conn)
+	return pkg.SendMsg(connBufWriter, msg)
 }

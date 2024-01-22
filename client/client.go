@@ -22,7 +22,7 @@ func NewClient(serverAddress string, hashCashMaxIterationsAmount int32) (*Client
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("connected to", serverAddress)
+	log.Printf("connected to %s", serverAddress)
 
 	return &Client{
 		conn:                        conn,
@@ -52,14 +52,14 @@ func (client *Client) HandleConnection(ctx context.Context) (string, error) {
 		MessageType: pkg.RequestChallenge,
 	})
 	if err != nil {
-		return "", fmt.Errorf("sending request failed: %w", err)
+		return "", fmt.Errorf("sending request for challenge failed: %w", err)
 	}
 	msg, err := pkg.ReadMsg(connBufReader)
 	if err != nil {
-		return "", fmt.Errorf("reading msg failed: %w", err)
+		return "", fmt.Errorf("reading challenge msg failed: %w", err)
 	}
-	var hashcash *pkg.HashcashHeader
-	err = json.Unmarshal([]byte(msg.Payload), hashcash)
+	var hashcash *pkg.HashcashHeader = new(pkg.HashcashHeader)
+	err = json.Unmarshal([]byte(msg.Payload), &hashcash)
 	if err != nil {
 		return "", fmt.Errorf("hashcash unmarshal failed: %w", err)
 	}
@@ -89,7 +89,7 @@ func (client *Client) HandleConnection(ctx context.Context) (string, error) {
 	// 4. get result quote from server
 	resultMsg, err := pkg.ReadMsg(connBufReader)
 	if err != nil {
-		return "", fmt.Errorf("reading msg failed: %w", err)
+		return "", fmt.Errorf("reading last response msg failed: %w", err)
 	}
 	return resultMsg.Payload, nil
 }

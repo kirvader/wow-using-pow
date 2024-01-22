@@ -16,7 +16,6 @@ type HashcashHeader struct {
 	Counter    int32
 }
 
-// ToString - stringifies hashcash for next sending it on TCP
 func (h HashcashHeader) ToString() string {
 	stringDate := fmt.Sprintf(
 		"%02d%02d%02d%02d%02d%02d",
@@ -60,11 +59,9 @@ func ComputeHashcash(header *HashcashHeader, maxCounterValue int32) (*HashcashHe
 		if err != nil {
 			return nil, err
 		}
-		//fmt.Println(header, hash)
 		if IsHashCorrect(hash, header.ZerosCount) {
 			return header, nil
 		}
-		// if hash don't have needed count of leading zeros, we are increasing counter and try next hash
 		header.Counter++
 	}
 	return nil, fmt.Errorf("max iterations exceeded")
