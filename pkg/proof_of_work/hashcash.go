@@ -72,13 +72,10 @@ func (h *Hashcash) encode() string {
 	}
 
 	stringDate := fmt.Sprintf(
-		"%02d%02d%02d%02d%02d%02d",
+		"%02d%02d%02d",
 		h.Date.Year()%100,
 		h.Date.Month(),
 		h.Date.Day(),
-		h.Date.Hour(),
-		h.Date.Minute(),
-		h.Date.Second(),
 	)
 
 	return fmt.Sprintf("%d:%d:%s:%s:%s:%s:%d", h.Version, h.ZerosCount, stringDate, h.Resource, h.Extension, h.Rand, h.Counter)

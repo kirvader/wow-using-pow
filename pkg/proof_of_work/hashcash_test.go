@@ -34,7 +34,7 @@ func TestHashcash_Encode(t *testing.T) {
 				Rand:       "abracadabra",
 				Counter:    -239,
 			},
-			want: "123:152:080916061332:unavailable:some:abracadabra:-239",
+			want: "123:152:080916:unavailable:some:abracadabra:-239",
 		},
 		{
 			name: "common data",
@@ -47,7 +47,7 @@ func TestHashcash_Encode(t *testing.T) {
 				Rand:       "AnAJT=/34",
 				Counter:    1512497,
 			},
-			want: "1:3:080916061332:kirill.kondratiuk::AnAJT=/34:1512497",
+			want: "1:3:080916:kirill.kondratiuk::AnAJT=/34:1512497",
 		},
 	}
 
