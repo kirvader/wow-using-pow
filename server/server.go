@@ -5,30 +5,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net"
 	"time"
 
 	protocol "github.com/kirvader/wow-using-pow/internal/protocol"
-	"github.com/kirvader/wow-using-pow/internal/utils"
 	"github.com/kirvader/wow-using-pow/pkg/clock"
 	pow "github.com/kirvader/wow-using-pow/pkg/proof_of_work"
 	"github.com/kirvader/wow-using-pow/pkg/storage"
 )
 
-type hashcashConfig struct {
-	zerosCount        int32
-	challengeDuration *time.Duration
-}
-
 type Server struct {
-	listener net.Listener
-
-	storageSet storage.StorageSet
-	clock      clock.Clock
-
-	hashcashConfig *hashcashConfig
+	listener         net.Listener
+	storageSet       storage.StorageSet
+	clock            clock.Clock
+	challengeBuilder pow.POWChallengeBuilder
 }
 
 func NewServer(ctx context.Context, serverAddress, redisAddress string, hashcashZerosCount int32, hashcashChallengeDuration *time.Duration) (*Server, error) {
@@ -49,9 +42,9 @@ func NewServer(ctx context.Context, serverAddress, redisAddress string, hashcash
 		listener:   listener,
 
 		clock: &clock.SystemClock{},
-		hashcashConfig: &hashcashConfig{
-			zerosCount:        hashcashZerosCount,
-			challengeDuration: hashcashChallengeDuration,
+		challengeBuilder: &pow.HashcashBuilder{
+			ZerosCount:        hashcashZerosCount,
+			ChallengeDuration: hashcashChallengeDuration,
 		},
 	}, nil
 }
@@ -87,87 +80,87 @@ func (srv *Server) handleConnection(ctx context.Context, conn net.Conn) {
 			log.Printf("reading message from connection failed: %v", err)
 			return
 		}
-		if err = srv.processRequest(ctx, msg, conn); err != nil {
+		if err = srv.processRequest(ctx, conn, conn.RemoteAddr().String(), msg); err != nil {
 			log.Printf("process request error: %v", err)
 			return
 		}
 	}
 }
 
-func (srv *Server) processRequest(ctx context.Context, msg *protocol.Message, conn net.Conn) error {
-	clientInfo := conn.RemoteAddr().String()
+func (srv *Server) sendChallengeToClient(ctx context.Context, connWriter io.Writer, clientId string) error {
 	currentTime := srv.clock.Now()
-	connBufWriter := bufio.NewWriter(conn)
+	connBufWriter := bufio.NewWriter(connWriter)
 
+	challenge, randVal := srv.challengeBuilder.GenerateRandomChallenge(&currentTime, clientId)
+	// to check in the future that server actually used this randVal
+	err := srv.storageSet.InsertClientToken(ctx, clientId, randVal, *srv.challengeBuilder.GetChallengeDuration())
+	if err != nil {
+		return fmt.Errorf("inserting into storage set failed: %w", err)
+	}
+
+	return protocol.SendChallenge(connBufWriter, challenge)
+}
+
+func (srv *Server) checkClientChallengeSolution(ctx context.Context, clientId string, solution pow.POWChallenge) (bool, error) {
+	if solution.GetResourse() != clientId {
+		return false, errors.New("invalid resource")
+	}
+
+	// verify that challenge's rand value was generated on server
+	clientToken, err := srv.storageSet.GetClientToken(ctx, solution.GetResourse())
+	if err != nil {
+		return false, fmt.Errorf("client token doesn't exist: %w", err)
+	}
+	if clientToken != solution.GetRand() {
+		return false, errors.New("wrong client token")
+	}
+
+	// as a rand value is generated for each challenge - we want to make sure it won't be used to verify duplicates
+	if err := srv.storageSet.Delete(ctx, solution.GetResourse()); err != nil {
+		return false, fmt.Errorf("deleting from storage set failed: %w", err)
+	}
+
+	// solution shouldn't take more than setup challengeDuration
+	if srv.clock.Now().Sub(*solution.GetDate()) > *srv.challengeBuilder.GetChallengeDuration() {
+		return false, errors.New("challenge expired")
+	}
+
+	// verify according to POW puzzle
+	valid, err := solution.Verify()
+	if err != nil {
+		return false, fmt.Errorf("verifying challenge solution failed: %w", err)
+	}
+	return valid, err
+}
+
+func (srv *Server) processRequest(ctx context.Context, connWriter io.Writer, clientId string, msg *protocol.Message) error {
 	switch msg.MessageType {
-	case protocol.Quit:
+	case protocol.ForceQuit:
 		log.Print("client requests to close connection")
 		return nil
 
 	case protocol.ChallengeRequest:
-		log.Printf("client %s requests challenge\n", clientInfo)
-
-		randVal := utils.GenerateRandomString()
-
-		// to check that server actually used this randVal
-		err := srv.storageSet.Add(ctx, randVal, *srv.hashcashConfig.challengeDuration)
-		if err != nil {
-			return fmt.Errorf("err add rand to cache: %w", err)
-		}
-
-		hashcash := pow.Hashcash{
-			Version:    1,
-			ZerosCount: srv.hashcashConfig.zerosCount,
-			Date:       &currentTime,
-			Resource:   clientInfo,
-			Rand:       randVal,
-			Counter:    0,
-		}
-
-		return protocol.SendChallenge(connBufWriter, &hashcash)
+		log.Printf("client %s requests challenge\n", clientId)
+		return srv.sendChallengeToClient(ctx, connWriter, clientId)
 	case protocol.ResourceRequest:
 		powSolution := new(pow.Hashcash)
 		if err := powSolution.FromJSON(msg.Payload); err != nil {
 			return err
 		}
 
-		log.Printf("client solved challenge and requests resource. client: %s, payload %s\n", clientInfo, msg.Payload)
+		log.Printf("client solved challenge and requests resource. client: %s, payload %s\n", clientId, msg.Payload)
 
-		// check if resource of puzzle is client's
-		if powSolution.Resource != clientInfo {
-			return errors.New("invalid hashcash resource")
-		}
-
-		// verify that puzzle's rand value was generated on server
-		exists, err := srv.storageSet.Exists(ctx, powSolution.Rand)
+		valid, err := srv.checkClientChallengeSolution(ctx, clientId, powSolution)
 		if err != nil {
-			return fmt.Errorf("err get rand from cache: %w", err)
-		}
-		if !exists {
-			return errors.New("challenge expired")
-		}
-
-		// as a rand value is generated for each challenge - we want to make sure it won't be used to verify duplicates
-		if err := srv.storageSet.Delete(ctx, powSolution.Rand); err != nil {
-			return fmt.Errorf("err get rand from cache: %w", err)
-		}
-
-		// solution shouldn't take more than setup challengeDuration
-		if currentTime.Sub(*powSolution.Date) > *srv.hashcashConfig.challengeDuration {
-			return errors.New("challenge expired")
-		}
-
-		// verify according to POW puzzle
-		valid, err := powSolution.Verify()
-		if err != nil {
-			return fmt.Errorf("verifying hashcash failed: %v", err)
+			return fmt.Errorf("verifying challenge solution failed: %v", err)
 		}
 		if !valid {
-			return errors.New("invalid hashcash")
+			return errors.New("invalid solution")
 		}
+
 		log.Print("Solution verified. Sending a word of wisdom.")
 
-		return protocol.SendResource(connBufWriter)
+		return protocol.SendResource(bufio.NewWriter(connWriter))
 	default:
 		return errors.New("invalid message type")
 	}

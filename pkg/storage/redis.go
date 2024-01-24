@@ -15,10 +15,6 @@ type RedisClient struct {
 	client *redis.Client
 }
 
-const (
-	DefaultRedisValue = "present"
-)
-
 func NewRedisCache(ctx context.Context, address string) (*RedisClient, error) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr: address,
@@ -34,16 +30,16 @@ func NewRedisCache(ctx context.Context, address string) (*RedisClient, error) {
 	}, nil
 }
 
-func (rc *RedisClient) Add(ctx context.Context, key string, duration time.Duration) error {
-	return rc.client.Set(ctx, key, DefaultRedisValue, duration).Err()
+func (rc *RedisClient) InsertClientToken(ctx context.Context, key, value string, duration time.Duration) error {
+	return rc.client.Set(ctx, key, value, duration).Err()
 }
 
-func (rc *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
-	res, err := rc.client.Exists(ctx, key).Result()
+func (rc *RedisClient) GetClientToken(ctx context.Context, key string) (string, error) {
+	res, err := rc.client.Get(ctx, key).Result()
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	return res > 0, nil
+	return res, nil
 }
 
 func (rc *RedisClient) Delete(ctx context.Context, key string) error {

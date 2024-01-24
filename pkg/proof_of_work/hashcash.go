@@ -6,9 +6,43 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/kirvader/wow-using-pow/internal/utils"
 )
 
-var _ POWPuzzle = &Hashcash{}
+type HashcashBuilder struct {
+	ZerosCount        int32
+	ChallengeDuration *time.Duration
+}
+
+func (builder *HashcashBuilder) GenerateRandomChallenge(currentTime *time.Time, resource string) (POWChallenge, string) {
+	randomId := utils.GenerateRandomString()
+	return &Hashcash{
+		Version:    1,
+		ZerosCount: builder.ZerosCount,
+		Date:       currentTime,
+		Resource:   resource,
+		Rand:       randomId,
+		Counter:    0,
+	}, randomId
+}
+
+func (builder *HashcashBuilder) GenerateChallengeById(currentTime *time.Time, resource, randomId string) POWChallenge {
+	return &Hashcash{
+		Version:    1,
+		ZerosCount: builder.ZerosCount,
+		Date:       currentTime,
+		Resource:   resource,
+		Rand:       randomId,
+		Counter:    0,
+	}
+}
+
+func (builder *HashcashBuilder) GetChallengeDuration() *time.Duration {
+	return builder.ChallengeDuration
+}
+
+var _ POWChallenge = &Hashcash{}
 
 type Hashcash struct {
 	Version    int32
@@ -20,7 +54,23 @@ type Hashcash struct {
 	Counter    int32
 }
 
-func (h Hashcash) Encode() string {
+func (h *Hashcash) GetDate() *time.Time {
+	return h.Date
+}
+
+func (h *Hashcash) GetRand() string {
+	return h.Rand
+}
+
+func (h *Hashcash) GetResourse() string {
+	return h.Resource
+}
+
+func (h *Hashcash) encode() string {
+	if h == nil {
+		return ""
+	}
+
 	stringDate := fmt.Sprintf(
 		"%02d%02d%02d%02d%02d%02d",
 		h.Date.Year()%100,
@@ -57,7 +107,7 @@ func isHashCorrect(hash string, zerosCount int32) bool {
 
 func (header *Hashcash) Solve(maxIterationsAmount int32) error {
 	for header.Counter <= maxIterationsAmount {
-		strHeader := header.Encode()
+		strHeader := header.encode()
 		hash, err := countSHA1(strHeader)
 		if err != nil {
 			return err
@@ -71,7 +121,7 @@ func (header *Hashcash) Solve(maxIterationsAmount int32) error {
 }
 
 func (header *Hashcash) Verify() (bool, error) {
-	hash, err := countSHA1(header.Encode())
+	hash, err := countSHA1(header.encode())
 	if err != nil {
 		return false, fmt.Errorf("computing sha failed: %v", err)
 	}

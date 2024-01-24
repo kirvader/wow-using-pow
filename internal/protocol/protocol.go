@@ -14,7 +14,7 @@ func RequestChallenge(bufWriter *bufio.Writer) error {
 	})
 }
 
-func SendChallenge(bufWriter *bufio.Writer, puzzle pow.POWPuzzle) error {
+func SendChallenge(bufWriter *bufio.Writer, puzzle pow.POWChallenge) error {
 	payload, err := puzzle.ToJSON()
 	if err != nil {
 		return fmt.Errorf("marshalling puzzle failed: %v", err)
@@ -26,7 +26,7 @@ func SendChallenge(bufWriter *bufio.Writer, puzzle pow.POWPuzzle) error {
 	return Write(bufWriter, msg)
 }
 
-func ReceiveChallenge(bufReader *bufio.Reader) (pow.POWPuzzle, error) {
+func ReceiveChallenge(bufReader *bufio.Reader) (pow.POWChallenge, error) {
 	msg, err := Read(bufReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading challenge msg failed: %w", err)
@@ -38,7 +38,7 @@ func ReceiveChallenge(bufReader *bufio.Reader) (pow.POWPuzzle, error) {
 	return hashcash, nil
 }
 
-func SendChallengeSolution(bufWriter *bufio.Writer, solution pow.POWPuzzle) error {
+func SendChallengeSolution(bufWriter *bufio.Writer, solution pow.POWChallenge) error {
 	payload, err := solution.ToJSON()
 	if err != nil {
 		return err

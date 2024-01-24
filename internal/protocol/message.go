@@ -3,19 +3,20 @@ package protocol
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
-type MessageType int32
+type MessageType string
 
 const (
-	Quit MessageType = iota
+	ForceQuit MessageType = "Force quit"
 
-	ChallengeRequest
-	ChallengeResponse
+	ChallengeRequest  MessageType = "Challenge request"
+	ChallengeResponse MessageType = "Challenge response"
 
-	ResourceRequest
-	ResourceResponse
+	ResourceRequest  MessageType = "Resource request"
+	ResourceResponse MessageType = "Resource response"
 )
 
 type Message struct {
@@ -37,6 +38,9 @@ func Read(reader *bufio.Reader) (*Message, error) {
 }
 
 func Write(writer *bufio.Writer, msg *Message) error {
+	if msg == nil {
+		return errors.New("message is nil")
+	}
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		return err
