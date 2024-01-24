@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/kirvader/wow-using-pow/internal/utils"
 )
 
@@ -53,8 +54,8 @@ func TestHashcash_Encode(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			got := testCase.input.encode()
-			if got != testCase.want {
-				t.Errorf("Hashcash.Encode failed. Got %s, expected %s", got, testCase.want)
+			if diff := cmp.Diff(got, testCase.want); diff != "" {
+				t.Errorf("Hashcash.Encode failed. Diff: %s", diff)
 			}
 		})
 	}
@@ -66,7 +67,7 @@ func TestHashcashProofOfWorkWorkflow(t *testing.T) {
 	resource := "kirill.kondratiuk"
 	rand.Seed(239)
 
-	for index := 0; index < 50; index++ {
+	for index := 0; index < 100; index++ {
 		t.Run(fmt.Sprintf("test #%d", index), func(t *testing.T) {
 			current := &Hashcash{
 				Version:    1,
