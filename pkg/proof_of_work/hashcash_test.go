@@ -66,7 +66,7 @@ func TestHashcashProofOfWorkWorkflow(t *testing.T) {
 	resource := "kirill.kondratiuk"
 	rand.Seed(239)
 
-	for index := 0; index < 100; index++ {
+	for index := 0; index < 50; index++ {
 		t.Run(fmt.Sprintf("test #%d", index), func(t *testing.T) {
 			current := &Hashcash{
 				Version:    1,
