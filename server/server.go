@@ -34,8 +34,10 @@ func NewServer(ctx context.Context, serverAddress, redisAddress string, hashcash
 	if err != nil {
 		return nil, fmt.Errorf("error init cache: %v", err)
 	}
-
-	rand.Seed(time.Now().UnixNano())
+	// In general we need to initialize random with some big rnd number for safety reasons
+	// rand.Seed(time.Now().UnixNano())
+	// But for testing stability(and only) I will initialize it with a const magic number, so that you will be able to see the same result every time :)
+	rand.Seed(239)
 
 	return &Server{
 		storageSet: redisClient,
